@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Shield, Users, FileText, Settings, Home, BookOpen, Bell, Database, LogOut, Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -43,6 +43,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   ];
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <div className="min-h-screen bg-sce-lightgray">
@@ -87,10 +92,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   variant="outline"
                   size="sm"
                   className="w-full bg-transparent border-white text-white hover:bg-white hover:text-sce-secondary"
-                  onClick={() => {
-                    logout();
-                    navigate('/');
-                  }}
+                  onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
                   Выйти
@@ -139,10 +141,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               </div>
               <button
                 className="w-full flex items-center px-2 py-2 text-sm font-medium text-white hover:bg-sce-accent rounded-sm"
-                onClick={() => {
-                  logout();
-                  navigate('/');
-                }}
+                onClick={handleLogout}
               >
                 <LogOut className="mr-3 h-5 w-5" />
                 Выйти
