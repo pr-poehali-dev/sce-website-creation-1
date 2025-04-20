@@ -6,7 +6,7 @@ export default {
 		"./pages/**/*.{ts,tsx}",
 		"./components/**/*.{ts,tsx}",
 		"./app/**/*.{ts,tsx}",
-		"./src/**/*.{ts,tsx}",
+		"./src/**/*.{ts,tsx}"
 	],
 	prefix: "",
 	theme: {
@@ -18,7 +18,19 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				'scp': ['"SCP-Bauhaus"', 'sans-serif'],
+			},
 			colors: {
+				sce: {
+					primary: '#990000', // основной цвет SCE
+					secondary: '#2d2d2d', // вторичный цвет
+					accent: '#666666', // акцентный цвет
+					text: '#000000', // цвет текста
+					background: '#f7f7f7', // цвет фона
+					lightgray: '#e3e3e3', // светло-серый цвет
+					darkgray: '#333333', // темно-серый цвет
+				},
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -92,5 +104,5 @@ export default {
 			}
 		}
 	},
-	plugins: [require("tailwindcss-animate")],
+	plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')],
 } satisfies Config;
