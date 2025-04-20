@@ -5,6 +5,23 @@ export interface User {
   role: UserRole;
   createdAt: Date;
   clearanceLevel: number;
+  isApproved: boolean;
+  profileId?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  userId: string;
+  fullName?: string;
+  avatar?: string;
+  bio?: string;
+  position?: string;
+  department?: string;
+  joinDate: Date;
+  lastActive: Date;
+  contactInfo?: string;
+  contributions: number;
+  badges: string[];
 }
 
 export enum UserRole {
@@ -104,6 +121,7 @@ export interface RegistrationRequest {
   id: string;
   email: string;
   username: string;
+  password: string;
   status: RegistrationStatus;
   createdAt: Date;
 }

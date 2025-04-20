@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '@/types';
+import { useData } from './DataContext';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +20,7 @@ const ADMIN_EMAIL = 'artemkauniti@gmail.com';
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { createRegistrationRequest } = useData();
 
   useEffect(() => {
     // Проверка наличия сохраненного пользователя в localStorage
@@ -57,6 +59,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Неверный пароль');
       }
       
+      // Проверяем, одобрен ли аккаунт
+      if (foundUser.role !== 'ADMIN' && foundUser.isApproved === false) {
+        throw new Error('Ваш аккаунт еще не одобрен администрацией');
+      }
+      
       // Убираем пароль из объекта пользователя перед сохранением в контексте
       const { password: _, ...userWithoutPassword } = foundUser;
       
@@ -87,29 +94,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Пользователь с таким email уже существует');
       }
       
-      // Создаем нового пользователя
+      // Проверяем количество пользователей
       const isFirstUser = users.length === 0;
       const isAdminEmail = email === ADMIN_EMAIL;
       
-      const newUser: User & { password: string } = {
-        id: Date.now().toString(),
-        email,
-        username,
-        password, // В реальном приложении пароль должен быть хэширован
-        role: isFirstUser || isAdminEmail ? UserRole.ADMIN : UserRole.READER,
-        clearanceLevel: isFirstUser || isAdminEmail ? 5 : 1,
-        createdAt: new Date(),
-      };
-      
-      // Сохраняем пользователя в "базе данных" (localStorage)
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('sce_users', JSON.stringify(updatedUsers));
-      
-      // Если это первый пользователь или специальный email, автоматически входим
+      // Если это первый пользователь или админский email
       if (isFirstUser || isAdminEmail) {
+        // Создаем нового пользователя с правами администратора
+        const newUser: User & { password: string } = {
+          id: Date.now().toString(),
+          email,
+          username,
+          password,
+          role: UserRole.ADMIN,
+          clearanceLevel: 5,
+          createdAt: new Date(),
+          isApproved: true,
+        };
+        
+        // Сохраняем пользователя и логинимся
+        const updatedUsers = [...users, newUser];
+        localStorage.setItem('sce_users', JSON.stringify(updatedUsers));
+        
         const { password: _, ...userWithoutPassword } = newUser;
         setUser(userWithoutPassword);
         localStorage.setItem('sce_user', JSON.stringify(userWithoutPassword));
+      } else {
+        // Создаем запрос на регистрацию для обычных пользователей
+        await createRegistrationRequest({
+          email,
+          username,
+          password,
+        });
       }
       
     } catch (error) {

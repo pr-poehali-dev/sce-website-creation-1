@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { SCEObject, News, Report, RegistrationRequest, Position, User } from '@/types';
+import { SCEObject, News, Report, RegistrationRequest, Position, User, UserProfile } from '@/types';
 
 interface DataContextType {
   sceObjects: SCEObject[];
@@ -7,6 +7,7 @@ interface DataContextType {
   reports: Report[];
   registrationRequests: RegistrationRequest[];
   positions: Position[];
+  userProfiles: UserProfile[];
   
   // SCE объекты
   createSCEObject: (object: Omit<SCEObject, 'id' | 'createdAt' | 'updatedAt'>) => Promise<SCEObject>;
@@ -24,8 +25,19 @@ interface DataContextType {
   deleteReport: (id: string) => Promise<void>;
   
   // Запросы на регистрацию
+  createRegistrationRequest: (request: Omit<RegistrationRequest, 'id' | 'createdAt' | 'status'>) => Promise<RegistrationRequest>;
   approveRegistration: (id: string) => Promise<void>;
   rejectRegistration: (id: string) => Promise<void>;
+  
+  // Пользователи
+  getUsers: () => User[];
+  updateUser: (id: string, userData: Partial<User>) => Promise<User>;
+  deleteUser: (id: string) => Promise<void>;
+  
+  // Профили пользователей
+  getUserProfile: (userId: string) => UserProfile | undefined;
+  createUserProfile: (profile: Omit<UserProfile, 'id'>) => Promise<UserProfile>;
+  updateUserProfile: (id: string, profile: Partial<UserProfile>) => Promise<UserProfile>;
   
   // Должности
   createPosition: (position: Omit<Position, 'id'>) => Promise<Position>;
@@ -41,6 +53,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [reports, setReports] = useState<Report[]>([]);
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   
   // Загрузка данных из localStorage при инициализации
   useEffect(() => {
@@ -49,13 +62,95 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadedReports = JSON.parse(localStorage.getItem('sce_reports') || '[]');
     const loadedRegistrationRequests = JSON.parse(localStorage.getItem('sce_registration_requests') || '[]');
     const loadedPositions = JSON.parse(localStorage.getItem('sce_positions') || '[]');
+    const loadedUserProfiles = JSON.parse(localStorage.getItem('sce_user_profiles') || '[]');
     
     setSceObjects(loadedSceObjects);
     setNews(loadedNews);
     setReports(loadedReports);
     setRegistrationRequests(loadedRegistrationRequests);
     setPositions(loadedPositions);
+    setUserProfiles(loadedUserProfiles);
   }, []);
+  
+  // Получение списка пользователей
+  const getUsers = (): User[] => {
+    const usersString = localStorage.getItem('sce_users') || '[]';
+    return JSON.parse(usersString);
+  };
+  
+  // Обновление пользователя
+  const updateUser = async (id: string, userData: Partial<User>): Promise<User> => {
+    const users = getUsers();
+    const index = users.findIndex(u => u.id === id);
+    
+    if (index === -1) throw new Error('Пользователь не найден');
+    
+    const updatedUser = { ...users[index], ...userData };
+    users[index] = updatedUser;
+    
+    localStorage.setItem('sce_users', JSON.stringify(users));
+    
+    // Обновляем данные в активной сессии, если это текущий пользователь
+    const currentUser = JSON.parse(localStorage.getItem('sce_user') || 'null');
+    if (currentUser && currentUser.id === id) {
+      localStorage.setItem('sce_user', JSON.stringify(updatedUser));
+    }
+    
+    return updatedUser;
+  };
+  
+  // Удаление пользователя
+  const deleteUser = async (id: string): Promise<void> => {
+    const users = getUsers().filter(user => user.id !== id);
+    localStorage.setItem('sce_users', JSON.stringify(users));
+    
+    // Удаляем профиль пользователя
+    const updatedProfiles = userProfiles.filter(profile => profile.userId !== id);
+    setUserProfiles(updatedProfiles);
+    localStorage.setItem('sce_user_profiles', JSON.stringify(updatedProfiles));
+    
+    // Если удаляется текущий пользователь, выходим из системы
+    const currentUser = JSON.parse(localStorage.getItem('sce_user') || 'null');
+    if (currentUser && currentUser.id === id) {
+      localStorage.removeItem('sce_user');
+    }
+  };
+  
+  // Профили пользователей
+  const getUserProfile = (userId: string): UserProfile | undefined => {
+    return userProfiles.find(profile => profile.userId === userId);
+  };
+  
+  const createUserProfile = async (profile: Omit<UserProfile, 'id'>): Promise<UserProfile> => {
+    const newProfile: UserProfile = {
+      ...profile,
+      id: Date.now().toString()
+    };
+    
+    const updatedProfiles = [...userProfiles, newProfile];
+    setUserProfiles(updatedProfiles);
+    localStorage.setItem('sce_user_profiles', JSON.stringify(updatedProfiles));
+    
+    // Обновляем пользователя, чтобы связать его с профилем
+    await updateUser(profile.userId, { profileId: newProfile.id });
+    
+    return newProfile;
+  };
+  
+  const updateUserProfile = async (id: string, profileData: Partial<UserProfile>): Promise<UserProfile> => {
+    const index = userProfiles.findIndex(p => p.id === id);
+    
+    if (index === -1) throw new Error('Профиль не найден');
+    
+    const updatedProfile = { ...userProfiles[index], ...profileData };
+    const updatedProfiles = [...userProfiles];
+    updatedProfiles[index] = updatedProfile;
+    
+    setUserProfiles(updatedProfiles);
+    localStorage.setItem('sce_user_profiles', JSON.stringify(updatedProfiles));
+    
+    return updatedProfile;
+  };
   
   // Функции для работы с SCE объектами
   const createSCEObject = async (object: Omit<SCEObject, 'id' | 'createdAt' | 'updatedAt'>): Promise<SCEObject> => {
@@ -180,29 +275,57 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('sce_reports', JSON.stringify(updatedReports));
   };
   
+  // Функция для создания запроса на регистрацию
+  const createRegistrationRequest = async (
+    request: Omit<RegistrationRequest, 'id' | 'createdAt' | 'status'>
+  ): Promise<RegistrationRequest> => {
+    const newRequest: RegistrationRequest = {
+      ...request,
+      id: Date.now().toString(),
+      status: 'PENDING',
+      createdAt: new Date(),
+    };
+    
+    const updatedRequests = [...registrationRequests, newRequest];
+    setRegistrationRequests(updatedRequests);
+    localStorage.setItem('sce_registration_requests', JSON.stringify(updatedRequests));
+    
+    return newRequest;
+  };
+  
   // Функции для работы с запросами на регистрацию
   const approveRegistration = async (id: string): Promise<void> => {
     const request = registrationRequests.find(r => r.id === id);
     if (!request) throw new Error('Запрос на регистрацию не найден');
     
     // Получаем текущих пользователей
-    const usersString = localStorage.getItem('sce_users') || '[]';
-    const users = JSON.parse(usersString);
+    const users = getUsers();
     
     // Создаем нового пользователя
-    const newUser: User & { password: string } = {
+    const newUser: User = {
       id: Date.now().toString(),
       email: request.email,
       username: request.username,
-      password: 'default_password', // В реальном приложении должен быть сгенерирован и отправлен на почту
-      role: UserRole.READER,
+      role: 'READER',
       clearanceLevel: 1,
       createdAt: new Date(),
+      isApproved: true,
     };
     
     // Сохраняем пользователя
     const updatedUsers = [...users, newUser];
     localStorage.setItem('sce_users', JSON.stringify(updatedUsers));
+    
+    // Создаем профиль для нового пользователя
+    const newProfile: Omit<UserProfile, 'id'> = {
+      userId: newUser.id,
+      joinDate: new Date(),
+      lastActive: new Date(),
+      contributions: 0,
+      badges: ['Новичок'],
+    };
+    
+    await createUserProfile(newProfile);
     
     // Обновляем статус запроса
     const updatedRequests = registrationRequests.map(r => 
@@ -267,6 +390,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       reports,
       registrationRequests,
       positions,
+      userProfiles,
       createSCEObject,
       updateSCEObject,
       deleteSCEObject,
@@ -276,8 +400,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createReport,
       updateReport,
       deleteReport,
+      createRegistrationRequest,
       approveRegistration,
       rejectRegistration,
+      getUsers,
+      updateUser,
+      deleteUser,
+      getUserProfile,
+      createUserProfile,
+      updateUserProfile,
       createPosition,
       updatePosition,
       deletePosition,
